@@ -28,7 +28,8 @@ resources:
         IdentityPoolName: FeToDDBDemoIdentityPool
         AllowUnauthenticatedIdentities: false
         CognitoIdentityProviders:
-          - ProviderName: !GetAtt CognitoUserPool.ProviderName
+          - ClientId: !Ref CognitoUserPoolClient
+            ProviderName: !GetAtt CognitoUserPool.ProviderName
             ServerSideTokenCheck: true
     
     CognitoIdentityPoolRoleAttachment:
@@ -36,42 +37,50 @@ resources:
       Properties:
         IdentityPoolId: !Ref CognitoIdentityPool
         Roles:
-          authenticated:
-            Type: AWS::IAM::Role
-            Properties:
-              RoleName: FeToDDBDemoAuthenticatedRole
-              AssumeRolePolicyDocument:
-                Version: "2012-10-17"
-                Statement:
-                  - Effect: Allow
-                    Principal:
-                      Federated: cognito-identity.amazonaws.com
-                    Action:
-                      - sts:AssumeRoleWithWebIdentity
-                    Condition:
-                      StringEquals:
-                        cognito-identity.amazonaws.com:aud:
-                          Ref: CognitoIdentityPool
-                    Policy:
-                      Version: "2012-10-17"
-                      Statement:
-                        - Effect: Allow
-                          Action:
-                            - dynamodb:PutItem
-                            - dynamodb:GetItem
-                            - dynamodb:UpdateItem
-                            - dynamodb:DeleteItem
-                            - dynamodb:Query
-                          Resource: !GetAtt DynamoDBTable.Arn
-                          Condition:
-                            ForAllValues:StringEquals:
-                              dynamodb:LeadingKeys:
-                                - "${cognito-identity.amazonaws.com:sub}"
-                        - Effect: Allow
-                          Action:
-                            - s3:PutObject
-                            - s3:GetObject*
-                          Resource: !Sub ${S3Bucket.Arn}/${cognito-identity.amazonaws.com:sub}/*
+          authenticated: !GetAtt CognitoIdentityPoolRole.Arn
+    
+    CognitoIdentityPoolRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: FeToDDBDemoAuthenticatedRole
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Federated: cognito-identity.amazonaws.com
+              Action:
+                - sts:AssumeRoleWithWebIdentity
+              Condition:
+                StringEquals:
+                  cognito-identity.amazonaws.com:aud:
+                    Ref: CognitoIdentityPool
+        Policies:
+          - PolicyName: FeToDDBDemoAuthenticatedRolePolicy
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - dynamodb:PutItem
+                    - dynamodb:GetItem
+                    - dynamodb:UpdateItem
+                    - dynamodb:DeleteItem
+                    - dynamodb:Query
+                  Resource: !GetAtt DynamoDBTable.Arn
+                  Condition:
+                    ForAllValues:StringEquals:
+                      dynamodb:LeadingKeys:
+                        # this is kinda silly, but Serverless Framework doesn't let you
+                        # use ${cognito-identity.amazonaws.com:sub} directly, because it
+                        # tries to parse it as a Serverless Framework variable...
+                        - !Join ["", ["$", "{cognito-identity.amazonaws.com:sub}"]]
+                - Effect: Allow
+                  Action:
+                    - s3:PutObject
+                    - s3:GetObject*
+                  Resource:
+                            - !Join ["", [ !GetAtt S3Bucket.Arn, "/$", "{cognito-identity.amazonaws.com:sub}/*"]]
 
     CognitoUserPool:
       Type: AWS::Cognito::UserPool
@@ -89,3 +98,16 @@ resources:
             RequireSymbols: true
             RequireUppercase: true
   
+    CognitoUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: FeToDDBDemoUserPoolClient
+        GenerateSecret: false
+        UserPoolId: !Ref CognitoUserPool
+        ExplicitAuthFlows:
+          - ALLOW_USER_SRP_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+
+  Outputs:
+    CognitoProviderName:
+      Value: !GetAtt CognitoUserPool.ProviderName
