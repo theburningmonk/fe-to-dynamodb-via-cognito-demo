@@ -1,0 +1,91 @@
+service: fe-to-ddb-demo
+
+frameworkVersion: "3"
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+
+resources:
+  Resources:
+    DynamoDBTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+    S3Bucket:
+      Type: AWS::S3::Bucket
+
+    CognitoIdentityPool:
+      Type: AWS::Cognito::IdentityPool
+      Properties:
+        IdentityPoolName: FeToDDBDemoIdentityPool
+        AllowUnauthenticatedIdentities: false
+        CognitoIdentityProviders:
+          - ProviderName: !GetAtt CognitoUserPool.ProviderName
+            ServerSideTokenCheck: true
+    
+    CognitoIdentityPoolRoleAttachment:
+      Type: AWS::Cognito::IdentityPoolRoleAttachment
+      Properties:
+        IdentityPoolId: !Ref CognitoIdentityPool
+        Roles:
+          authenticated:
+            Type: AWS::IAM::Role
+            Properties:
+              RoleName: FeToDDBDemoAuthenticatedRole
+              AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: Allow
+                    Principal:
+                      Federated: cognito-identity.amazonaws.com
+                    Action:
+                      - sts:AssumeRoleWithWebIdentity
+                    Condition:
+                      StringEquals:
+                        cognito-identity.amazonaws.com:aud:
+                          Ref: CognitoIdentityPool
+                    Policy:
+                      Version: "2012-10-17"
+                      Statement:
+                        - Effect: Allow
+                          Action:
+                            - dynamodb:PutItem
+                            - dynamodb:GetItem
+                            - dynamodb:UpdateItem
+                            - dynamodb:DeleteItem
+                            - dynamodb:Query
+                          Resource: !GetAtt DynamoDBTable.Arn
+                          Condition:
+                            ForAllValues:StringEquals:
+                              dynamodb:LeadingKeys:
+                                - "${cognito-identity.amazonaws.com:sub}"
+                        - Effect: Allow
+                          Action:
+                            - s3:PutObject
+                            - s3:GetObject*
+                          Resource: !Sub ${S3Bucket.Arn}/${cognito-identity.amazonaws.com:sub}/*
+
+    CognitoUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: FeToDDBDemoUserPool
+        UsernameAttributes:
+          - email
+        AutoVerifiedAttributes:
+          - email
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 8
+            RequireLowercase: true
+            RequireNumbers: true
+            RequireSymbols: true
+            RequireUppercase: true
+  
