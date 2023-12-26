@@ -21,6 +21,19 @@ resources:
 
     S3Bucket:
       Type: AWS::S3::Bucket
+      Properties:
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders:
+                - '*'
+              AllowedMethods:
+                - GET
+                - PUT
+                - HEAD
+                - DELETE
+                - POST
+              AllowedOrigins:
+                - '*'
 
     CognitoIdentityPool:
       Type: AWS::Cognito::IdentityPool
@@ -80,7 +93,7 @@ resources:
                     - s3:PutObject
                     - s3:GetObject*
                   Resource:
-                            - !Join ["", [ !GetAtt S3Bucket.Arn, "/$", "{cognito-identity.amazonaws.com:sub}/*"]]
+                    - !Join ["", [ !GetAtt S3Bucket.Arn, "/$", "{cognito-identity.amazonaws.com:sub}/test.json"]]
 
     CognitoUserPool:
       Type: AWS::Cognito::UserPool
