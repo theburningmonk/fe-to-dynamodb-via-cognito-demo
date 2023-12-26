@@ -80,13 +80,13 @@ import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3
 Amplify.configure({
   Auth: {
     Cognito: {
-      userPoolId: 'us-east-1_61fPGLqPy',
-      userPoolClientId: 'pj84hfn9j33qv2c1otekkd668'      
+      userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID,
+      userPoolClientId: import.meta.env.VITE_COGNITO_USER_POOL_CLIENT_ID
     }
   }
 })
 
-const cognitoClient = new CognitoIdentityClient({ region: 'us-east-1' })
+const cognitoClient = new CognitoIdentityClient({ region: import.meta.env.VITE_AWS_REGION })
 let documentClient
 let s3Client
 
@@ -163,9 +163,9 @@ async function signIn() {
 
 async function getCredentials(session) {
   const getIdResp = await cognitoClient.send(new GetIdCommand({
-    IdentityPoolId: 'us-east-1:35fb3fb6-6d0a-40a2-bb20-8ad217fe51fa',
+    IdentityPoolId: import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID,
     Logins: {
-      'cognito-idp.us-east-1.amazonaws.com/us-east-1_61fPGLqPy': session.tokens.idToken.toString()
+      [import.meta.env.VITE_COGNITO_PROVIDER_NAME]: session.tokens.idToken.toString()
     }
   }))
   identityId.value = getIdResp.IdentityId
@@ -173,13 +173,13 @@ async function getCredentials(session) {
   const getCredResp = await cognitoClient.send(new GetCredentialsForIdentityCommand({
     IdentityId: identityId.value,
     Logins: {
-      'cognito-idp.us-east-1.amazonaws.com/us-east-1_61fPGLqPy': session.tokens.idToken.toString()
+      [import.meta.env.VITE_COGNITO_PROVIDER_NAME]: session.tokens.idToken.toString()
     }
   }))
   console.log(getCredResp)
 
   const dynamoDBClient = new DynamoDBClient({ 
-    region: 'us-east-1',
+    region: import.meta.env.VITE_AWS_REGION,
     credentials: {
       accessKeyId: getCredResp.Credentials.AccessKeyId,
       secretAccessKey: getCredResp.Credentials.SecretKey,
@@ -188,7 +188,7 @@ async function getCredentials(session) {
   })
   documentClient = DynamoDBDocument.from(dynamoDBClient)
   s3Client = new S3Client({
-    region: 'us-east-1',
+    region: import.meta.env.VITE_AWS_REGION,
     credentials: {
       accessKeyId: getCredResp.Credentials.AccessKeyId,
       secretAccessKey: getCredResp.Credentials.SecretKey,
@@ -216,7 +216,7 @@ async function signOut() {
 
 async function putDDBAuthed() {
   await documentClient.put({
-    TableName: 'fe-to-ddb-demo-dev-DynamoDBTable-19XGQZA97MP2X',
+    TableName: import.meta.env.VITE_DYNAMODB_TABLE_NAME,
     Item: {
       userId: identityId.value,
       timestamp: new Date().toISOString()
@@ -229,7 +229,7 @@ async function putDDBAuthed() {
 async function putDDBUnauthed() {
   try {
     await documentClient.put({
-      TableName: 'fe-to-ddb-demo-dev-DynamoDBTable-19XGQZA97MP2X',
+      TableName: import.meta.env.VITE_DYNAMODB_TABLE_NAME,
       Item: {
         userId: 'some-other-user',
         timestamp: new Date().toISOString()
@@ -244,7 +244,7 @@ async function putDDBUnauthed() {
 
 async function getDDBAuthed() {
   const resp = await documentClient.get({
-    TableName: 'fe-to-ddb-demo-dev-DynamoDBTable-19XGQZA97MP2X',
+    TableName: import.meta.env.VITE_DYNAMODB_TABLE_NAME,
     Key: {
       userId: identityId.value
     }
@@ -256,7 +256,7 @@ async function getDDBAuthed() {
 async function getDDBUnauthed() {
   try {
     await documentClient.get({
-      TableName: 'fe-to-ddb-demo-dev-DynamoDBTable-19XGQZA97MP2X',
+      TableName: import.meta.env.VITE_DYNAMODB_TABLE_NAME,
       Key: {
         userId: user.value.userId
       }
@@ -270,7 +270,7 @@ async function getDDBUnauthed() {
 
 async function putS3Authed() {
   await s3Client.send(new PutObjectCommand({
-    Bucket: 'fe-to-ddb-demo-dev-s3bucket-dis3fqurudqo',
+    Bucket: import.meta.env.VITE_S3_BUCKET_NAME,
     Key: `${identityId.value}/test.json`,
     Body: JSON.stringify({
       userId: identityId.value,
@@ -284,7 +284,7 @@ async function putS3Authed() {
 async function putS3UnauthedUser() {
   try {
     await s3Client.send(new PutObjectCommand({
-      Bucket: 'fe-to-ddb-demo-dev-s3bucket-dis3fqurudqo',
+      Bucket: import.meta.env.VITE_S3_BUCKET_NAME,
       Key: 'some-other-user/test.json',
       Body: JSON.stringify({
         userId: identityId.value,
@@ -301,7 +301,7 @@ async function putS3UnauthedUser() {
 async function putS3UnauthedObject() {
   try {
     await s3Client.send(new PutObjectCommand({
-      Bucket: 'fe-to-ddb-demo-dev-s3bucket-dis3fqurudqo',
+      Bucket: import.meta.env.VITE_S3_BUCKET_NAME,
       Key: `${identityId.value}/some-other-file.json`,
       Body: JSON.stringify({
         userId: identityId.value,
@@ -317,7 +317,7 @@ async function putS3UnauthedObject() {
 
 async function getS3Authed() {
   const resp = await s3Client.send(new GetObjectCommand({
-    Bucket: 'fe-to-ddb-demo-dev-s3bucket-dis3fqurudqo',
+    Bucket: import.meta.env.VITE_S3_BUCKET_NAME,
     Key: `${identityId.value}/test.json`
   }))
 
@@ -329,7 +329,7 @@ async function getS3Authed() {
 async function getS3UnauthedUser() {
   try {
     await s3Client.send(new GetObjectCommand({
-      Bucket: 'fe-to-ddb-demo-dev-s3bucket-dis3fqurudqo',
+      Bucket: import.meta.env.VITE_S3_BUCKET_NAME,
       Key: 'some-other-user/test.json'
     }))
   
@@ -342,7 +342,7 @@ async function getS3UnauthedUser() {
 async function getS3UnauthedObject() {
   try {
     await s3Client.send(new GetObjectCommand({
-      Bucket: 'fe-to-ddb-demo-dev-s3bucket-dis3fqurudqo',
+      Bucket: import.meta.env.VITE_S3_BUCKET_NAME,
       Key: `${identityId.value}/some-other-file.json`
     }))
   
