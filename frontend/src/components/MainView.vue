@@ -30,7 +30,7 @@
         <button class="underline text-left" @click="signOut">Sign Out</button>
       </div>
     </div>
-    <div v-if="cred !== null" class="flex flex-col gap-y-10">
+    <div v-if="cred !== null && signInStep === 'SIGNED_IN'" class="flex flex-col gap-y-10">
       <div class="flex flex-col gap-y-2">
         <h1 class="font-semibold text-4xl">DynamoDB</h1>
         <div class="flex flex-col max-w-60 gap-y-2">
